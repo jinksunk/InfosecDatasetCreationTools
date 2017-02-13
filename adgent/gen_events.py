@@ -21,7 +21,7 @@ import sys
 import os
 import logging
 import dumper
-from evtgen.datasources import PCAP, NT4EVT
+from evtgen.datasources import PCAP, NT4EVT, W3CEVT
 
 from argparse import ArgumentParser
 from argparse import RawDescriptionHelpFormatter
@@ -89,7 +89,7 @@ USAGE
         args = parser.parse_args()
         verbose = args.verbose
         
-        if verbose > 0:
+        if verbose and verbose > 0:
             logging.basicConfig(format='[%(created)f] %(levelname)s %(filename)s:%(lineno)d - %(message)s', level=logging.DEBUG)
         else:
             logging.basicConfig(format='[%(created)f] %(levelname)s %(filename)s:%(lineno)d - %(message)s', level=logging.INFO)
@@ -104,6 +104,10 @@ USAGE
             # Add support for listing available event types
             print("\n\t".join(gf.get_available_generators()))
             sys.exit(0)
+            
+        elif not args.eventtype:
+            parser.print_help()
+            sys.exit(1)
 
         # Determine how many events to generate of what type
         # Determine what type of event to generate
@@ -117,8 +121,9 @@ USAGE
         # Setup location dictionary:
         locations = dict()
         if args.logoutfile is not None:
-            locations[NT4EVT] = args.logoutfile
-            mylog.debug("Writing event log messages to file {}".format(locations[NT4EVT]))
+            #locations[NT4EVT] = args.logoutfile
+            locations[W3CEVT] = args.logoutfile
+            mylog.debug("Writing event log messages to file {}".format(locations[W3CEVT]))
         if args.outfile is not None:
             locations[PCAP] = args.outfile
             mylog.debug("Writing pcap traces to file {}".format(locations[PCAP]))

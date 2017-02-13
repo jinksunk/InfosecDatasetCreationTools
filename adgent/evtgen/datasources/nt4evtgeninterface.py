@@ -6,8 +6,8 @@ Created on Nov 16, 2016
 import socket
 import struct
 import logging
-from src.evtgen.datasources import NT4EVT
-from src.evtgen.datasources.datasourceinterface import DataGenerator, DataElement, DataStore, LabelFile
+from evtgen.datasources import NT4EVT
+from evtgen.datasources.datasourceinterface import DataGenerator, DataElement, DataStore, LabelFile
 from scapy.all import *
 
 class NT4EventStore(DataStore):
@@ -34,8 +34,7 @@ class NT4EventStore(DataStore):
         self.mylog.debug("Adding {} nt4evt lines for event {}".format(len(dilist), event.get_id()))
         if dilist is not None:
             # Insert log elements into list in timestamp sorted order:
-            for d in dilist:
-                element = EventNT4EVT(d)
+            for element in dilist:
                 self.mylog.debug("Adding data element time:{} eventid:{} to list.".format(
                     element.get_time(),
                     event.get_id()
@@ -50,7 +49,7 @@ class NT4EventStore(DataStore):
 
         with open(target, 'w') as ntLogOut:
             for nt4event in self.data_list:
-                ntLogOut.write(nt4event.get_raw_element())
+                print (nt4event.get_raw_element(), file=ntLogOut)
 
 class NT4LabelFile(LabelFile):
     mylog = logging.getLogger(__name__)

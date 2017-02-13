@@ -41,10 +41,9 @@ class PacketStore(DataStore):
         self.mylog.debug("Adding {} packets for event {}".format(len(dilist), event.get_id()))
         if dilist is not None:
             # Insert packet elements into list in timestamp sorted order:
-            for d in dilist:
-                element = DataElement(d.time, event.get_id(), d)
+            for element in dilist:
                 self.mylog.debug("Adding data element time:{} eventid:{} to list.".format(
-                    d.time,
+                    element.get_timestamp(),
                     event.get_id()
                     ))
                 self.data_list.append(element)
@@ -54,13 +53,50 @@ class PacketStore(DataStore):
         '''
         From the Interface Definition - this will write the packets to the given file descriptor.
         '''
+        # Unpack data elements into a list of packets:
         self.data_list.sort(key=lambda x: x.get_timestamp(), reverse=False)
-        self.mylog.info("Writing {} packets to file {}".format(len(self.data_list), target))
-        wrpcap(target, [x.get_raw_element() for x in self.data_list])
+        plist = list()
+        for raw_pkts in [x.get_raw_element() for x in self.data_list]:
+            plist.extend(raw_pkts)
+        self.mylog.info("Writing {} packets to file {}".format(len(plist), target))
+        wrpcap(target, plist)
         '''
         for de in self.data_list:
             wrpcap(target, de.get_raw())
         '''
+        labels = PKTLabelFile(self)
+        labels.write("{}-labels".format(target))
+
+class PKTLabelFile(LabelFile):
+    '''
+    A label set which uniquely identifies each packet. For a pcap file, this includes the features:
+    * packetTimestamp,packetID,srcIP,dstIP eventID
+    where the srcIP and dstIP are in dotted-quad format
+    '''
+    mylog = logging.getLogger(__name__)
+    
+    def __init__(self, datasource):
+        super(PKTLabelFile, self).__init__(datasource)
+    
+    def write(self, target):
+        '''
+        Write out the packets labelled appropriately in event order.
+        '''
+        label_hash = dict()
+        plist = list()
+        with open(target, 'w') as pktLabelOut:
+            for ev in self.datasource.get_events():
+                for di in ev.get_datainstances(self.datasource.supported_source):
+                    for plist in di.get_raw_element():
+                        for pkt in plist:
+                            print("{},{},{},{},{}".format(
+                                    pkt.time,             # Packet Timestamp
+                                    pkt[scapy.all.IP].id, # Packet ID
+                                    pkt[scapy.all.IP].src,# Source IP
+                                    pkt[scapy.all.IP].dst,# Destination IP
+                                    ev.get_id()),        # Event ID
+                                  file=pktLabelOut)
+
 
 class PacketGenerator(DataGenerator):
     '''
@@ -109,6 +145,36 @@ class PacketGenerator(DataGenerator):
         #int(float(lines[len(lines) - 2].split(" ")[0]))
         self.mylog.debug("Extracted time range [{},{}]".format(startts,endts))
         return [startts,endts]
+    
+class EventPKTEVT(DataElement):
+    '''
+    Represents an event that consists of one or more packets in sequence:
+    '''
+    mylog = logging.getLogger(__name__)
+
+    def __init__(self, pktlist, eventid):
+        '''
+        Initialize a packet data element, where the packet is produced by SCAPY
+        '''
+        self.wrapped = pktlist
+        self.eventid = eventid
+        super(EventPKTEVT, self).__init__(self.get_time(), 
+                                          self.get_eventID(), pktlist)
+        
+    def get_eventID(self):
+        '''
+        Return the event ID for this log line:
+        '''
+        self.mylog.debug("Extracting ID from PKT event.")
+        return self.eventid
+    
+    def get_time(self):
+        '''
+        Return the timestamp for the last packet in the sequence:
+        '''
+        self.mylog.debug("Extracting time from PKT sequence: {}".format(self.wrapped))
+        timestamp = str(self.wrapped[-1][scapy.all.IP].time)
+        return timestamp
     
 class TCPSession(object):
     '''
@@ -236,19 +302,3 @@ class TCPSession(object):
         else:
             self.packetID = (self.packetID + 1) % 65535
         return self.packetID
-
-class PacketLabelFile(LabelFile):
-    mylog = logging.getLogger(__name__)
-    
-    def __init__(self, datasource):
-        super(PacketLabelFile, self).__init__()
-    
-    def write(self, target):
-        """
-        Write a label file, giving each packet it in the list a value > 0, 
-        corresponding to the event under consideration.  In general, will try
-        to distribute packets evenly across events.
-        """
-        with open(target, 'w') as wFile:
-            for line in self.packetGenerator.getPacketIdentifiers():
-                wFile.write("{0}\n".format(line))

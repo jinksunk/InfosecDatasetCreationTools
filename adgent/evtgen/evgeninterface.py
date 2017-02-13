@@ -41,7 +41,7 @@ class EventInterface(object):
         return self.myID
     
     def get_datainstances(self, datasource):
-        self.mylog.debug("Returning data elements for source {}".format(datasource))
+        self.mylog.debug("Returning data elements for event {} - source {}".format(self.get_id(), datasource))
         if datasource in self.datainstances.keys():
             return self.datainstances[datasource]
         else:

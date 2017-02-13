@@ -39,8 +39,19 @@ class DataStore(object):
         Interface Definition - will add the event to the set of events from which data will be
         stored.
         '''
-        self.mylog.debug("Adding event {} to event_list".format(event.get_id()))
+        self.mylog.debug("Adding event {} to event_list".format( event.get_id()))
+        
         self.event_list.append(event)
+        
+        self.mylog.debug("Now contains {} data elements (timestamps: {} )".format(
+            len(self.get_datalist()),
+            ",".join(x.get_time() for x in self.get_datalist())))
+        
+    def get_events(self):
+        '''
+        Return a list of events stored in this data store:
+        '''
+        return self.event_list
         
     def length(self):
         '''
@@ -56,6 +67,20 @@ class DataStore(object):
         '''
         self.mylog.error("Interface unimplemented.  Use a subclass instead.")
         sys.exit(1)
+        
+    def get_datalist(self):
+        '''
+        Return the list of data instances added to the store. Data instances are subclassed from DataElement.
+        '''
+        dilist = list()
+        self.mylog.debug("Datasource {} contains {} events".format(self.supported_source, len(self.event_list)))
+        for ev in self.event_list:
+            dtmp = ev.get_datainstances(self.supported_source)
+            self.mylog.debug("Adding {} data instances for event {}".format(
+                len(dtmp), ev.get_id()))
+            if len(dtmp) > 0:
+                dilist.extend(dtmp)
+        return dilist
         
 class DataElement(object):
     '''
